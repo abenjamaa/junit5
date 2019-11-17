@@ -10,7 +10,11 @@ import fr.hm.hapiour.adherent.metier.parameter.ParameterService;
 import fr.hm.hapiour.adherent.security.authentication.ContratReduce;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.math.BigInteger;
@@ -18,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -63,7 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         Mockito.when(mockCourrierSanteDocumentService.getCarteMutualisteList(Mockito.any(), Mockito.any())).thenReturn(inputCards);
     }
 
-    @Test
+@Test
      void itSouldReturnsTheLast2CardsWhenTheEditionDateOfTheLastCardIsLessThan21DaysComparedToTodaysDate() {
         givenInputCardList(
                 createCarteMutuelleEditiqueRenouvellementFixture("2019-10-15+02:00", idDocument + MERGE_CM_R),
@@ -81,7 +86,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     }
 
     @Test
-     void itShouldReturnsTheLast2CardsWhenTheEditionDateOfTheLastCardIsLessThan21DaysComparedToTodaysDateAndNextYearCard() {
+    @DisplayName("on doit récupperer 2 cartes")
+    void itShouldReturnsTheLast2CardsWhenTheEditionDateOfTheLastCardIsLessThan21DaysComparedToTodaysDateAndNextYearCard() {
         givenInputCardList(
                 createCarteMutuelleEditiqueRenouvellementFixture("2020-10-15+02:00", idDocument + MERGE_CM_R),
                 createCarteMutuelleAnneeEnCoursFixture("2020-02-02+00:00", CURRENTCARDID + MERGE_CM_R),
@@ -125,36 +131,50 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         );
     }
 
-    @Test
-     void itShouldReturnCurrentAndNextCards() {
-        givenInputCardList(
-                createCarteMutuelleEditiqueRenouvellementFixture("2019-10-15+02:00", idDocument + MERGE_CM_R), //carteMutuelEditeEnOctobre2019PourRenouvellement2020
-                createCarteMutuelleEditiqueRenouvellementFixture("2018-11-01+00:00", CURRENTCARDID + MERGE_CM_R) // currentCard
-        );
-        givenEffectiveDate(2019, 11, 4);
-
+    @ParameterizedTest
+    @MethodSource("cardsProvider")
+     void itShouldReturnCurrentAndNextCards(List<CarteMutuelEditique> givenCards,LocalDateTime effectiveDate,List<CarteTpInfoArchive>  expectedCards) {
+        givenInputCardListParam(givenCards);
+        givenEffectiveDateParam(effectiveDate);
         whenWeCallGetListeCarteTpDisponibles();
-
-        thenOutputCardsShouldMatch(
-                new CarteTpInfoArchive(2020, LocalDateTime.parse("2019-10-15T02:00"), true, idDocument + MERGE_CM_R + "2019-10-15+02:00"),
-                new CarteTpInfoArchive(2019, LocalDateTime.parse("2018-11-01T00:00"), true, CURRENTCARDID + MERGE_CM_R + "2018-11-01+00:00")
-        );
+        thenOutputCardsShouldMatchPram(expectedCards );
     }
 
+    private static Stream<Arguments> cardsProvider() {
+        return Stream.of(
+                Arguments.of(
+                        Arrays.asList(createCarteMutuelleEditiqueRenouvellementFixture("2019-10-15+02:00", idDocument + MERGE_CM_R), //carteMutuelEditeEnOctobre2019PourRenouvellement2020
+                                createCarteMutuelleEditiqueRenouvellementFixture("2018-11-01+00:00", CURRENTCARDID + MERGE_CM_R))
+                        ,LocalDateTime.of(2019, 11, 4, 2, 0)
+                        ,Arrays.asList( new CarteTpInfoArchive(2020, LocalDateTime.parse("2019-10-15T02:00"), true, idDocument + MERGE_CM_R + "2019-10-15+02:00"),
+                                new CarteTpInfoArchive(2019, LocalDateTime.parse("2018-11-01T00:00"), true, CURRENTCARDID + MERGE_CM_R + "2018-11-01+00:00")
+                        )
+
+                ),
+                Arguments.of(
+                        Arrays.asList( createCarteMutuelleEditiqueRenouvellementFixture("2019-10-15+02:00", idDocument + MERGE_CM_R),
+                                createCarteMutuelleAnneeEnCoursFixture("2019-11-11+00:00", CURRENTCARDID + MERGE_CM_R),
+                                createCarteMutuelleAnneeEnCoursFixture("2020-07-05+02:00", CARTE_MUTUEL_DATE_EDITION_INFERIEUR_21 + MERGE_CM_R))
+                        ,LocalDateTime.of(2020, 7, 15, 2, 0)
+                        ,Arrays.asList(  new CarteTpInfoArchive(2020, LocalDateTime.parse("2020-07-05T02:00"), false, CARTE_MUTUEL_DATE_EDITION_INFERIEUR_21 + MERGE_CM_R + "2020-07-05+02:00"),
+                                new CarteTpInfoArchive(2020, LocalDateTime.parse("2019-10-15T02:00"), true, idDocument + MERGE_CM_R + "2019-10-15+02:00")
+                        )
+
+                )
+        );
+
+    }
     @Test
      void itShouldReturnTheTwoCardForYear2020() {
         givenInputCardList(
-                createCarteMutuelleEditiqueRenouvellementFixture("2019-10-15+02:00", idDocument + MERGE_CM_R),
-                createCarteMutuelleAnneeEnCoursFixture("2019-11-11+00:00", CURRENTCARDID + MERGE_CM_R),
-                createCarteMutuelleAnneeEnCoursFixture("2020-07-05+02:00", CARTE_MUTUEL_DATE_EDITION_INFERIEUR_21 + MERGE_CM_R)
+
         );
         givenEffectiveDate(2020, 7, 15);
 
         whenWeCallGetListeCarteTpDisponibles();
 
         thenOutputCardsShouldMatch(
-                new CarteTpInfoArchive(2020, LocalDateTime.parse("2020-07-05T02:00"), false, CARTE_MUTUEL_DATE_EDITION_INFERIEUR_21 + MERGE_CM_R + "2020-07-05+02:00"),
-                new CarteTpInfoArchive(2020, LocalDateTime.parse("2019-10-15T02:00"), true, idDocument + MERGE_CM_R + "2019-10-15+02:00")
+
         );
     }
 
@@ -192,8 +212,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         inputCards.addAll(Arrays.asList(cards));
     }
 
+    private void givenInputCardListParam(List<CarteMutuelEditique> cards) {
+        inputCards.clear();
+        inputCards.addAll(cards);
+    }
+
     private void givenEffectiveDate(int year, int month, int day) {
         effectiveDate = LocalDateTime.of(year, month, day, 2, 0);
+    }
+
+    private void givenEffectiveDateParam(LocalDateTime eDate) {
+        effectiveDate = eDate;
     }
 
     private ContratReduce createContratReduceFixture() {
@@ -206,15 +235,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         return new ContratReduce(contrat, null);
     }
 
-    private CarteMutuelEditique createCarteMutuelleEditiqueRenouvellementFixture(String dateEdition, String idDocument) {
+    private static CarteMutuelEditique createCarteMutuelleEditiqueRenouvellementFixture(String dateEdition, String idDocument) {
         return createCarteMutuelleFixture(dateEdition, idDocument, true);
     }
 
-    private CarteMutuelEditique createCarteMutuelleAnneeEnCoursFixture(String dateEdition, String idDocument) {
+    private static CarteMutuelEditique createCarteMutuelleAnneeEnCoursFixture(String dateEdition, String idDocument) {
         return createCarteMutuelleFixture(dateEdition, idDocument, false);
     }
 
-    private CarteMutuelEditique createCarteMutuelleFixture(String dateEdition, String idDocument, boolean renouvellement) {
+    private static CarteMutuelEditique createCarteMutuelleFixture(String dateEdition, String idDocument, boolean renouvellement) {
         return new CarteMutuelEditique(
                 dateEdition,
                 idDocument,
@@ -222,27 +251,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         );
     }
 
-    private void whenWeCallGetListeCarteTpDisponibles() {
+    private void  whenWeCallGetListeCarteTpDisponibles() {
         outputCards = carteTpInfoArchiveService.getListeCarteTpDisponibles(contratReduce, effectiveDate);
     }
 
     private void thenOutputCardsShouldMatch(CarteTpInfoArchive ...expectedCards) {
         final List<CarteTpInfoArchive> cards = outputCards;
-        assertEquals(cards.size(),expectedCards.length);
-        for(int i = 0; i < cards.size(); i++) {
+        assertEquals(cards.size(), expectedCards.length);
+        for (int i = 0; i < cards.size(); i++) {
             final CarteTpInfoArchive card = cards.get(i);
             final CarteTpInfoArchive expectedCard = expectedCards[i];
             Assertions.assertAll("",
                     () -> assertEquals(card.getRenouvellement(), expectedCard.getRenouvellement()),
-                    ()-> assertEquals(card.getAnnee(), expectedCard.getAnnee()),
-            ()-> assertEquals(card.getDateEdition(), expectedCard.getDateEdition()),
-            ()-> assertEquals(card.getIdDocument(),expectedCard.getIdDocument()));
-
-//            assertThat(card.getRenouvellement()).isEqualTo(expectedCard.getRenouvellement());
-//            assertThat(card.getAnnee()).isEqualTo(expectedCard.getAnnee());
-//            assertThat(card.getDateEdition()).isEqualTo(expectedCard.getDateEdition());
-//            assertThat(card.getIdDocument()).isEqualTo(expectedCard.getIdDocument());
+                    () -> assertEquals(card.getAnnee(), expectedCard.getAnnee()),
+                    () -> assertEquals(card.getDateEdition(), expectedCard.getDateEdition()),
+                    () -> assertEquals(card.getIdDocument(), expectedCard.getIdDocument()));
         }
     }
+
+        private void thenOutputCardsShouldMatchPram(List<CarteTpInfoArchive> expectedCards) {
+            final List<CarteTpInfoArchive> cards = outputCards;
+            assertEquals(cards.size(),expectedCards.size());
+            for(int i = 0; i < cards.size(); i++) {
+                final CarteTpInfoArchive card = cards.get(i);
+                final CarteTpInfoArchive expectedCard = expectedCards.get(i);
+                Assertions.assertAll("",
+                        () -> assertEquals(card.getRenouvellement(), expectedCard.getRenouvellement()),
+                        ()-> assertEquals(card.getAnnee(), expectedCard.getAnnee()),
+                        ()-> assertEquals(card.getDateEdition(), expectedCard.getDateEdition()),
+                        ()-> assertEquals(card.getIdDocument(),expectedCard.getIdDocument()));
+            }
+        }
+
 
 }

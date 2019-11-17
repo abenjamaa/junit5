@@ -45,4 +45,5 @@ importer la dependance import org.junit.jupiter.api.Test;
 8 - remplacer le assert par Assertions.assertAll
 9 - relancer les tests -> ok
 10 - modifier 2 asserts et relancer les tests et dans la console vérifier que y a bien les 2 tests qui sont ko.
+11 - @DisplayName : permet de donner un nom arbitraire à une classe de test ou à un test
 11 rendre les tests parametrable
